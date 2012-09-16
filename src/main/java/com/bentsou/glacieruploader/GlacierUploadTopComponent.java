@@ -20,7 +20,10 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -36,8 +39,8 @@ import org.openide.DialogDescriptor;
 import org.openide.DialogDisplayer;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
-import org.openide.windows.TopComponent;
 import org.openide.util.NbBundle.Messages;
+import org.openide.windows.TopComponent;
 
 /**
  * Top component which displays something.
@@ -126,7 +129,7 @@ public final class GlacierUploadTopComponent extends TopComponent {
         @Override
         public void actionPerformed(ActionEvent e) {
 
-            UploadWorker worker = new UploadWorker();
+            UploadWorker worker = new UploadWorker(filenameLabel.getText());
             worker.execute();
         }
     }
@@ -161,9 +164,12 @@ public final class GlacierUploadTopComponent extends TopComponent {
     private class UploadWorker extends SwingWorker<String, String> {
         private ProgressHandle progress;
         private SimpleDateFormat df;
+        private String absolutePath;
         
         
-        public UploadWorker() {
+        public UploadWorker(String absolutePath) {
+            this.absolutePath = absolutePath;
+            
             df = (SimpleDateFormat) SimpleDateFormat.getInstance();
             df.applyPattern("yyyy-MM-dd H:m:s:S");
             outputArea.append("Start uploading...\n"); 
@@ -182,13 +188,14 @@ public final class GlacierUploadTopComponent extends TopComponent {
             byte[] buffer = new byte[Integer.valueOf(partSize)];
             List<byte[]> binaryChecksums = new LinkedList<>();
 
-            File file = new File(filenameLabel.getText());
-            FileInputStream fileToUpload = new FileInputStream(file);
+            Path path = Paths.get(absolutePath);
+            
+            InputStream fileToUpload2 = Files.newInputStream(path); 
             String contentRange;
             int read = 0;
 
-            while (currentPosition < file.length()) {
-                read = fileToUpload.read(buffer, filePosition, buffer.length);
+            while (currentPosition < Files.size(path)) {
+                read = fileToUpload2.read(buffer, filePosition, buffer.length);
                 if (read == -1) {
                     break;
                 }
@@ -227,6 +234,7 @@ public final class GlacierUploadTopComponent extends TopComponent {
             String checksum = TreeHashGenerator.calculateTreeHash(binaryChecksums);
             String location = CompleteMultiPartUpload(uploadId, checksum);
             publish("Location: " +location + "\n");
+            publish ("done");
             return checksum;
         }
 
